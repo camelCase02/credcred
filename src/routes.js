@@ -1,10 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/UserContext';
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import ProviderDashboard from './pages/provider/ProviderDashboard';
-import PayerDashboard from './pages/payer/PayerDashboard';
+import CredentialingDashboard from './pages/CredentialingDashboard';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 const AppRoutes = () => {
@@ -21,28 +19,22 @@ const AppRoutes = () => {
         path="/login"
         element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />}
       />
-      <Route
-        path="/register"
-        element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />}
-      />
 
       {/* Protected Routes */}
       <Route
         path="/dashboard"
         element={
           isAuthenticated ? (
-            user?.role === 'provider' ? (
-              <ProviderDashboard />
-            ) : user?.role === 'payer' ? (
-              <PayerDashboard />
-            ) : (
-              <Navigate to="/login" />
-            )
+            <CredentialingDashboard />
           ) : (
             <Navigate to="/login" />
           )
         }
       />
+
+      {/* Legacy redirects */}
+      <Route path="/payer/*" element={<Navigate to="/dashboard" />} />
+      <Route path="/provider/*" element={<Navigate to="/dashboard" />} />
 
       {/* Default Routes */}
       <Route path="/" element={<Navigate to="/login" />} />

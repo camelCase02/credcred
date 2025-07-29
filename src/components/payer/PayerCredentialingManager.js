@@ -40,7 +40,8 @@ import {
     Stepper,
     Step,
     StepLabel,
-    StepContent
+    StepContent,
+    CircularProgress
 } from '@mui/material';
 import {
     Assignment as AssignmentIcon,
@@ -55,14 +56,16 @@ import {
     Description as DescriptionIcon,
     Schedule as ScheduleIcon,
     Analytics as AnalyticsIcon,
-    ThumbUp as ThumbUpIcon,
-    ThumbDown as ThumbDownIcon,
     PendingActions as PendingActionsIcon,
     CloudUpload as CloudUploadIcon,
     Send as SendIcon,
     Storage as StorageIcon,
-    RuleFolder as RuleFolderIcon
+    RuleFolder as RuleFolderIcon,
+    Chat as ChatIcon,
+    PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
+import credentialingApi from '../../services/api/credentialingApi';
+import ProviderChatDialog from '../common/ProviderChatDialog';
 
 const PayerCredentialingManager = () => {
     const [processingQueue, setProcessingQueue] = useState([]);
@@ -70,8 +73,13 @@ const PayerCredentialingManager = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [detailsDialog, setDetailsDialog] = useState(false);
-    const [reviewDialog, setReviewDialog] = useState(false);
     const [analytics, setAnalytics] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Chat functionality
+    const [chatDialog, setChatDialog] = useState(false);
+    const [selectedProvider, setSelectedProvider] = useState(null);
 
     // Document Upload States
     const [activeTab, setActiveTab] = useState(0);
@@ -82,125 +90,89 @@ const PayerCredentialingManager = () => {
     const [uploading, setUploading] = useState(false);
     const [ocrResults, setOcrResults] = useState([]);
     const [processingStep, setProcessingStep] = useState(0);
-    const fileInputRef = useRef(null);    // Mock data for credentialing applications
-    useEffect(() => {
-        const mockApplications = [
-            {
-                id: 'CRED-2024-001',
-                providerName: 'Dr. Sarah Johnson',
-                specialty: 'Internal Medicine',
-                npi: '1234567890',
-                submissionDate: '2024-01-15',
-                status: 'under_review',
-                priority: 'high',
-                documentsProcessed: 12,
-                totalDocuments: 15,
-                complianceScore: 92,
-                hardRulesCompliant: 24,
+    const fileInputRef = useRef(null);
+
+    const loadProcessedDoctors = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await credentialingApi.getProcessedDoctors();
+
+            // Transform the backend data to match the UI expectations
+            const transformedApplications = data.map((doctor, index) => ({
+                id: `CRED-2024-${String(index + 1).padStart(3, '0')}`,
+                providerName: doctor.name,
+                specialty: doctor.specialty,
+                npi: `NPI${doctor.provider_id.replace(/[^0-9]/g, '')}`, // Generate NPI from provider_id
+                submissionDate: new Date(doctor.last_credentialed).toLocaleDateString(),
+                status: doctor.compliance_status === 'COMPLIANT' ? 'approved' : 'rejected',
+                priority: doctor.score >= 4 ? 'high' : doctor.score >= 3 ? 'medium' : 'low',
+                documentsProcessed: Math.floor(Math.random() * 5) + 15, // Mock document count
+                totalDocuments: Math.floor(Math.random() * 5) + 18, // Mock total documents
+                complianceScore: doctor.score * 20, // Convert 1-5 scale to percentage
+                hardRulesCompliant: 25, // Mock hard rules
                 totalHardRules: 25,
-                softRulesScore: 68,
+                softRulesScore: doctor.score * 20,
                 maxSoftRulesScore: 100,
-                estimatedCompletionDate: '2024-02-01',
-                assignedReviewer: 'Mary Rodriguez',
-                lastActivity: '2024-01-18',
+                estimatedCompletionDate: new Date(doctor.last_credentialed).toLocaleDateString(),
+                assignedReviewer: `Reviewer ${Math.floor(Math.random() * 5) + 1}`,
+                lastActivity: new Date(doctor.last_credentialed).toLocaleDateString(),
                 ocrProcessingComplete: true,
-                manualReviewRequired: true,
-                flags: ['license_expiring_soon'],
+                manualReviewRequired: doctor.score < 4,
+                flags: doctor.score < 3 ? ['quality_concerns'] : [],
+                processingTime: doctor.processing_time,
+                sessionId: doctor.session_id,
+                providerId: doctor.provider_id,
+                experienceYears: doctor.experience_years,
                 documents: [
                     { type: 'Medical License', status: 'verified', ocrConfidence: 95 },
-                    { type: 'DEA Certificate', status: 'verified', ocrConfidence: 88 },
-                    { type: 'Malpractice Insurance', status: 'pending_verification', ocrConfidence: 76 },
-                    { type: 'Board Certification', status: 'verified', ocrConfidence: 94 }
+                    { type: 'Board Certification', status: 'verified', ocrConfidence: 88 },
+                    { type: 'Malpractice Insurance', status: 'verified', ocrConfidence: 92 }
                 ]
-            },
-            {
-                id: 'CRED-2024-002',
-                providerName: 'Dr. Michael Chen',
-                specialty: 'Cardiology',
-                npi: '2345678901',
-                submissionDate: '2024-01-10',
-                status: 'approved',
-                priority: 'medium',
-                documentsProcessed: 18,
-                totalDocuments: 18,
-                complianceScore: 87,
-                hardRulesCompliant: 25,
-                totalHardRules: 25,
-                softRulesScore: 45,
-                maxSoftRulesScore: 100,
-                estimatedCompletionDate: '2024-01-25',
-                assignedReviewer: 'David Kim',
-                lastActivity: '2024-01-17',
-                ocrProcessingComplete: true,
-                manualReviewRequired: false,
-                flags: [],
-                approvalDate: '2024-01-17'
-            },
-            {
-                id: 'CRED-2024-003',
-                providerName: 'Dr. Emily Williams',
-                specialty: 'Emergency Medicine',
-                npi: '3456789012',
-                submissionDate: '2024-01-20',
-                status: 'processing',
-                priority: 'urgent',
-                documentsProcessed: 8,
-                totalDocuments: 16,
-                complianceScore: null,
-                hardRulesCompliant: null,
-                totalHardRules: 25,
-                softRulesScore: null,
-                maxSoftRulesScore: 100,
-                estimatedCompletionDate: '2024-02-05',
-                assignedReviewer: 'Jennifer Adams',
-                lastActivity: '2024-01-20',
-                ocrProcessingComplete: false,
-                manualReviewRequired: false,
-                flags: ['urgent_specialty_need']
-            },
-            {
-                id: 'CRED-2024-004',
-                providerName: 'Dr. Robert Davis',
-                specialty: 'Psychiatry',
-                npi: '4567890123',
-                submissionDate: '2024-01-12',
-                status: 'rejected',
-                priority: 'medium',
-                documentsProcessed: 10,
-                totalDocuments: 12,
-                complianceScore: 45,
-                hardRulesCompliant: 18,
-                totalHardRules: 25,
-                softRulesScore: 20,
-                maxSoftRulesScore: 100,
-                estimatedCompletionDate: null,
-                assignedReviewer: 'Lisa Thompson',
-                lastActivity: '2024-01-16',
-                ocrProcessingComplete: true,
-                manualReviewRequired: true,
-                flags: ['license_issues', 'malpractice_concerns'],
-                rejectionReason: 'Failed mandatory licensing requirements'
-            }
-        ];
+            }));
 
-        setProcessingQueue(mockApplications);
+            setProcessingQueue(transformedApplications);
+        } catch (err) {
+            console.error('Error loading processed doctors:', err);
+            setError('Failed to load credentialing data. Please check if the backend server is running.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        // Generate analytics
-        const totalApplications = mockApplications.length;
-        const approved = mockApplications.filter(app => app.status === 'approved').length;
-        const rejected = mockApplications.filter(app => app.status === 'rejected').length;
-        const avgProcessingTime = 12; // days
-        const ocrAccuracy = 89; // percentage
+    const loadCredentialingStats = async () => {
+        try {
+            const statsData = await credentialingApi.getCredentialingStats();
 
-        setAnalytics({
-            totalApplications,
-            approved,
-            rejected,
-            pending: totalApplications - approved - rejected,
-            avgProcessingTime,
-            ocrAccuracy,
-            approvalRate: Math.round((approved / totalApplications) * 100)
-        });
+            setAnalytics({
+                totalApplications: statsData.stats.total_providers,
+                approved: statsData.stats.compliant_providers,
+                rejected: statsData.stats.non_compliant_providers,
+                pending: 0, // No pending in the current API
+                avgProcessingTime: 12, // Mock value
+                ocrAccuracy: 89, // Mock value
+                approvalRate: Math.round(statsData.stats.compliance_rate * 100),
+                averageScore: statsData.stats.average_score
+            });
+        } catch (err) {
+            console.error('Error loading stats:', err);
+            // Set default analytics if API fails
+            setAnalytics({
+                totalApplications: processingQueue.length,
+                approved: processingQueue.filter(app => app.status === 'approved').length,
+                rejected: processingQueue.filter(app => app.status === 'rejected').length,
+                pending: processingQueue.filter(app => app.status === 'processing' || app.status === 'under_review').length,
+                avgProcessingTime: 12,
+                ocrAccuracy: 89,
+                approvalRate: 75
+            });
+        }
+    };
+
+    // Load real data from backend API on component mount
+    useEffect(() => {
+        loadProcessedDoctors();
+        loadCredentialingStats();
     }, []);
 
     // Filter applications based on status and search
@@ -245,23 +217,41 @@ const PayerCredentialingManager = () => {
         }
     };
 
-    // Handle application review
-    const handleReview = (application, decision, comments) => {
-        setProcessingQueue(prev =>
-            prev.map(app =>
-                app.id === application.id
-                    ? {
-                        ...app,
-                        status: decision,
-                        reviewComments: comments,
-                        reviewDate: new Date().toISOString(),
-                        lastActivity: new Date().toISOString().split('T')[0]
-                    }
-                    : app
-            )
-        );
-        setReviewDialog(false);
-        setSelectedApplication(null);
+    // Handle credentialing a new provider
+    const handleCredentialProvider = async (providerId) => {
+        try {
+            setLoading(true);
+            const result = await credentialingApi.credentialProvider(providerId);
+
+            if (result.success) {
+                // Refresh the processed doctors list
+                await loadProcessedDoctors();
+                await loadCredentialingStats();
+                alert(`Provider ${providerId} has been successfully credentialed!`);
+            }
+        } catch (err) {
+            console.error('Error credentialing provider:', err);
+            alert(`Failed to credential provider: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle opening chat dialog
+    const handleOpenChat = (application) => {
+        setSelectedProvider({
+            ...application,
+            id: application.providerId,
+            provider_id: application.providerId,
+            name: application.providerName
+        });
+        setChatDialog(true);
+    };
+
+    // Handle refresh data
+    const handleRefresh = async () => {
+        await loadProcessedDoctors();
+        await loadCredentialingStats();
     };
 
     // Export processing report
@@ -508,6 +498,18 @@ const PayerCredentialingManager = () => {
 
             {activeTab === 0 && (
                 <Box>
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    {loading && (
+                        <Box display="flex" justifyContent="center" sx={{ mb: 3 }}>
+                            <CircularProgress />
+                            <Typography sx={{ ml: 2 }}>Loading credentialing data...</Typography>
+                        </Box>
+                    )}
 
                     {/* Analytics Dashboard */}
                     {analytics && (
@@ -566,7 +568,9 @@ const PayerCredentialingManager = () => {
                                         <Box display="flex" alignItems="center">
                                             <AnalyticsIcon color="warning" sx={{ mr: 2 }} />
                                             <Box>
-                                                <Typography variant="h4">{analytics.ocrAccuracy}%</Typography>
+                                                <Typography variant="h4">
+                                                    89%
+                                                </Typography>
                                                 <Typography variant="body2" color="text.secondary">
                                                     OCR Accuracy
                                                 </Typography>
@@ -610,13 +614,14 @@ const PayerCredentialingManager = () => {
                                 </FormControl>
                             </Grid>
 
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={12} sm={6} md={2}>
                                 <Button
                                     variant="outlined"
                                     startIcon={<RefreshIcon />}
-                                    onClick={() => window.location.reload()}
+                                    onClick={handleRefresh}
+                                    disabled={loading}
                                 >
-                                    Refresh
+                                    {loading ? 'Loading...' : 'Refresh'}
                                 </Button>
                             </Grid>
 
@@ -627,6 +632,23 @@ const PayerCredentialingManager = () => {
                                     onClick={exportReport}
                                 >
                                     Export Report
+                                </Button>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={2}>
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    startIcon={<PlayArrowIcon />}
+                                    onClick={() => {
+                                        const providerId = prompt('Enter Provider ID to credential:');
+                                        if (providerId) {
+                                            handleCredentialProvider(providerId);
+                                        }
+                                    }}
+                                    disabled={loading}
+                                >
+                                    Credential New
                                 </Button>
                             </Grid>
                         </Grid>
@@ -759,17 +781,25 @@ const PayerCredentialingManager = () => {
                                                     </IconButton>
                                                 </Tooltip>
 
-                                                {application.manualReviewRequired && application.status === 'under_review' && (
-                                                    <Tooltip title="Review Application">
+                                                <Tooltip title="Chat about Provider">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        onClick={() => handleOpenChat(application)}
+                                                    >
+                                                        <ChatIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                {application.status === 'approved' && (
+                                                    <Tooltip title="Re-credential Provider">
                                                         <IconButton
                                                             size="small"
-                                                            color="primary"
-                                                            onClick={() => {
-                                                                setSelectedApplication(application);
-                                                                setReviewDialog(true);
-                                                            }}
+                                                            color="secondary"
+                                                            onClick={() => handleCredentialProvider(application.providerId)}
+                                                            disabled={loading}
                                                         >
-                                                            <AssignmentIcon />
+                                                            <PlayArrowIcon />
                                                         </IconButton>
                                                     </Tooltip>
                                                 )}
@@ -852,53 +882,6 @@ const PayerCredentialingManager = () => {
                         </DialogContent>
                         <DialogActions>
                             <Button onClick={() => setDetailsDialog(false)}>Close</Button>
-                        </DialogActions>
-                    </Dialog>
-
-                    {/* Review Dialog */}
-                    <Dialog
-                        open={reviewDialog}
-                        onClose={() => setReviewDialog(false)}
-                        maxWidth="sm"
-                        fullWidth
-                    >
-                        <DialogTitle>
-                            Review Application - {selectedApplication?.id}
-                        </DialogTitle>
-                        <DialogContent>
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="body1" gutterBottom>
-                                    Make a decision on this credentialing application:
-                                </Typography>
-
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    rows={4}
-                                    label="Review Comments"
-                                    variant="outlined"
-                                    sx={{ mt: 2 }}
-                                />
-                            </Box>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button onClick={() => setReviewDialog(false)}>Cancel</Button>
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                startIcon={<ThumbDownIcon />}
-                                onClick={() => handleReview(selectedApplication, 'rejected', 'Rejected after review')}
-                            >
-                                Reject
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="success"
-                                startIcon={<ThumbUpIcon />}
-                                onClick={() => handleReview(selectedApplication, 'approved', 'Approved after review')}
-                            >
-                                Approve
-                            </Button>
                         </DialogActions>
                     </Dialog>
                 </Box>
@@ -1151,6 +1134,14 @@ const PayerCredentialingManager = () => {
                     )}
                 </DialogActions>
             </Dialog>
+
+            {/* Provider Chat Dialog */}
+            <ProviderChatDialog
+                open={chatDialog}
+                onClose={() => setChatDialog(false)}
+                provider={selectedProvider}
+                sessionId={selectedProvider?.sessionId}
+            />
         </Box>
     );
 };

@@ -1,0 +1,1574 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Paper,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Button,
+    Chip,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    IconButton,
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Stack,
+    Avatar,
+    Tooltip,
+    Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    FormControlLabel,
+    Checkbox,
+    Divider,
+    CircularProgress
+} from '@mui/material';
+import {
+    Search as SearchIcon,
+    FilterList as FilterIcon,
+    Refresh as RefreshIcon,
+    Visibility as ViewIcon,
+    ThumbUp as ThumbUpIcon,
+    ThumbDown as ThumbDownIcon,
+    Schedule as ScheduleIcon,
+    CheckCircle as CheckCircleIcon,
+    Groups as GroupsIcon,
+    Assignment as AssignmentIcon,
+    Send as SendIcon,
+    Chat as ChatIcon,
+    Assessment as ReportIcon,
+    Download as DownloadIcon
+} from '@mui/icons-material';
+import { useAuth } from '../../contexts/UserContext';
+import ProviderDetailsDialog from './ProviderDetailsDialog';
+import ProviderChatSidebar from '../common/ProviderChatSidebar';
+import mockDatabase from '../../data/mockDatabase';
+
+const CommitteeReview = () => {
+    const { user } = useAuth();
+    const [providers, setProviders] = useState([]);
+    const [filteredProviders, setFilteredProviders] = useState([]);
+    const [selectedProvider, setSelectedProvider] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [chatOpen, setChatOpen] = useState(false);
+    const [chatProvider, setChatProvider] = useState(null);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
+    const [reportData, setReportData] = useState(null);
+    const [reportLoading, setReportLoading] = useState(false);
+    const [reportError, setReportError] = useState(null);
+    const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+    const [approvalProvider, setApprovalProvider] = useState(null);
+    const [approvalData, setApprovalData] = useState({
+        decision: '',
+        comments: '',
+        conditions: [],
+        followUpRequired: false
+    });
+    const [filters, setFilters] = useState({
+        search: '',
+        flaggedBy: '',
+        priority: '',
+        sortBy: 'flaggedDate'
+    });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        loadProviders();
+    }, []);
+
+    useEffect(() => {
+        applyFilters();
+    }, [providers, filters]);
+
+    const loadProviders = () => {
+        setLoading(true);
+        // Get only providers flagged for committee review
+        const committeeProviders = mockDatabase.getProviders()
+            .filter(p => p.status === 'Committee Review' && p.flaggedForCommittee);
+        setProviders(committeeProviders);
+        setLoading(false);
+    };
+
+    const applyFilters = () => {
+        let filtered = [...providers];
+
+        // Search filter
+        if (filters.search) {
+            filtered = filtered.filter(p =>
+                p.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+                p.id.toLowerCase().includes(filters.search.toLowerCase())
+            );
+        }
+
+        // Flagged by filter
+        if (filters.flaggedBy) {
+            filtered = filtered.filter(p => p.flaggedBy === filters.flaggedBy);
+        }
+
+        // Priority filter (based on network impact)
+        if (filters.priority) {
+            filtered = filtered.filter(p => p.networkImpact === filters.priority);
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            switch (filters.sortBy) {
+                case 'flaggedDate':
+                    return new Date(b.flaggedDate) - new Date(a.flaggedDate);
+                case 'networkImpact':
+                    const impactOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+                    return impactOrder[b.networkImpact] - impactOrder[a.networkImpact];
+                case 'name':
+                    return a.name.localeCompare(b.name);
+                case 'specialty':
+                    return a.specialty.localeCompare(b.specialty);
+                default:
+                    return 0;
+            }
+        });
+
+        setFilteredProviders(filtered);
+    };
+
+    const handleFilterChange = (field, value) => {
+        setFilters(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleProviderClick = (provider) => {
+        setSelectedProvider(provider);
+        setDialogOpen(true);
+    };
+
+    const handleApprovalClick = (provider, decision) => {
+        setApprovalProvider(provider);
+        setApprovalData({
+            decision,
+            comments: '',
+            conditions: [],
+            followUpRequired: false
+        });
+        setApprovalDialogOpen(true);
+    };
+
+    const handleApprovalSubmit = () => {
+        if (!approvalProvider) return;
+
+        const finalStatus = approvalData.decision === 'approve' ? 'Approved' : 'Denied';
+
+        const updatedProvider = {
+            ...approvalProvider,
+            status: finalStatus,
+            committeeDecision: approvalData.decision,
+            committeeComments: approvalData.comments,
+            committeeConditions: approvalData.conditions,
+            followUpRequired: approvalData.followUpRequired,
+            reviewedBy: user.name,
+            reviewDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+        };
+
+        // Create audit log entry
+        mockDatabase.addAuditLog({
+            providerId: approvalProvider.id,
+            action: `Application ${approvalData.decision}d by committee`,
+            user: user.name,
+            details: {
+                decision: approvalData.decision,
+                comments: approvalData.comments,
+                conditions: approvalData.conditions
+            }
+        });
+
+        // Update provider in database
+        mockDatabase.updateProvider(approvalProvider.id, updatedProvider);
+
+        // Remove from current view
+        loadProviders();
+
+        setApprovalDialogOpen(false);
+        setApprovalProvider(null);
+    };
+
+    const handleProviderUpdate = (updatedProvider) => {
+        mockDatabase.updateProvider(updatedProvider.id, updatedProvider);
+        setProviders(prev => prev.map(p => p.id === updatedProvider.id ? updatedProvider : p));
+    };
+
+    const handleChatOpen = (provider, e) => {
+        e.stopPropagation();
+        setChatProvider(provider);
+        setChatOpen(true);
+    };
+
+    const handleChatClose = () => {
+        setChatOpen(false);
+        setChatProvider(null);
+    };
+
+    const handleGenerateReport = async (e) => {
+        e.stopPropagation();
+        setReportLoading(true);
+        setReportError(null);
+        setReportData(null);
+        setReportDialogOpen(true);
+
+        try {
+            // Always use dr_williams_003 as specified
+            const response = await fetch('http://localhost:8000/report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    provider_id: 'dr_williams_003'
+                })
+
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            setReportData(data);
+        } catch (err) {
+            console.error('Report generation error:', err);
+            setReportError(`Failed to generate report: ${err.message}`);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    const handleReportClose = () => {
+        setReportDialogOpen(false);
+        setReportData(null);
+        setReportError(null);
+    };
+
+    const downloadReport = () => {
+        if (!reportData) return;
+
+        const reportContent = JSON.stringify(reportData, null, 2);
+        const blob = new Blob([reportContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `credentialing_report_${reportData.provider_id}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };    const getNetworkImpactColor = (impact) => {
+        switch (impact) {
+            case 'High': return 'error';
+            case 'Medium': return 'warning';
+            case 'Low': return 'success';
+            default: return 'default';
+        }
+    };
+
+    const getPriorityIcon = (impact) => {
+        switch (impact) {
+            case 'High': return '🔴';
+            case 'Medium': return '🟡';
+            case 'Low': return '🟢';
+            default: return '⚪';
+        }
+    };
+
+    const analysts = [...new Set(providers.map(p => p.flaggedBy))];
+    const priorities = [...new Set(providers.map(p => p.networkImpact))];
+
+    return (
+        <Box>
+            {/* Header Stats */}
+                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
+                                            <GroupsIcon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {filteredProviders.length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Pending Review
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
+                                            🔴
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {filteredProviders.filter(p => p.networkImpact === 'High').length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                High Priority
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
+                                            <ScheduleIcon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {filteredProviders.filter(p => {
+                                                    const daysSinceFlag = Math.floor(
+                                                        (new Date() - new Date(p.flaggedDate)) / (1000 * 60 * 60 * 24)
+                                                    );
+                                                    return daysSinceFlag > 7;
+                                                }).length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Overdue (7+ days)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
+                                            <CheckCircleIcon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {mockDatabase.getProviders().filter(p =>
+                                                    p.status === 'Approved' &&
+                                                    new Date(p.reviewDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                                                ).length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Approved (30 days)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    </Grid>
+
+                    {/* Filters */}
+                    <Paper sx={{ p: 3, mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Committee Review Filters
+                        </Typography>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={3}>
+                                <TextField
+                                    fullWidth
+                                    label="Search"
+                                    placeholder="Provider name or ID..."
+                                    value={filters.search}
+                                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                                    InputProps={{
+                                        startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Flagged By</InputLabel>
+                                    <Select
+                                        value={filters.flaggedBy}
+                                        label="Flagged By"
+                                        onChange={(e) => handleFilterChange('flaggedBy', e.target.value)}
+                                    >
+                                        <MenuItem value="">All Analysts</MenuItem>
+                                        {analysts.map(analyst => (
+                                            <MenuItem key={analyst} value={analyst}>{analyst}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Priority</InputLabel>
+                                    <Select
+                                        value={filters.priority}
+                                        label="Priority"
+                                        onChange={(e) => handleFilterChange('priority', e.target.value)}
+                                    >
+                                        <MenuItem value="">All Priorities</MenuItem>
+                                        {priorities.map(priority => (
+                                            <MenuItem key={priority} value={priority}>
+                                                {getPriorityIcon(priority)} {priority}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Sort By</InputLabel>
+                                    <Select
+                                        value={filters.sortBy}
+                                        label="Sort By"
+                                        onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                                    >
+                                        <MenuItem value="flaggedDate">Flagged Date</MenuItem>
+                                        <MenuItem value="name">Provider Name</MenuItem>
+                                        <MenuItem value="specialty">Specialty</MenuItem>
+                                        <MenuItem value="networkImpact">Priority Level</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={1}>
+                                <IconButton onClick={loadProviders}>
+                                    <RefreshIcon />
+                                </IconButton>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
+                    {/* Providers Table */}
+                    <Paper>
+                        <TableContainer>
+                            <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Priority</TableCell>
+                                        <TableCell>Provider</TableCell>
+                                        <TableCell>Specialty</TableCell>
+                                        <TableCell>Flagged By</TableCell>
+                                        <TableCell>Flagged Date</TableCell>
+                                        <TableCell>Days Pending</TableCell>
+                                        <TableCell>Network Impact</TableCell>
+                                        <TableCell>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {filteredProviders.map((provider) => {
+                                        const daysPending = Math.floor(
+                                            (new Date() - new Date(provider.flaggedDate)) / (1000 * 60 * 60 * 24)
+                                        );
+
+                                        return (
+                                            <TableRow
+                                                key={provider.id}
+                                                hover
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    backgroundColor: daysPending > 7 ? 'rgba(255, 152, 0, 0.1)' : 'inherit'
+                                                }}
+                                                onClick={() => handleProviderClick(provider)}
+                                            >
+                                                <TableCell>
+                                                    <Typography variant="h6">
+                                                        {getPriorityIcon(provider.networkImpact)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                                                            {provider.name.charAt(0)}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography variant="subtitle2">
+                                                                {provider.name}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {provider.id}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>{provider.specialty}</TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2">
+                                                        {provider.flaggedBy}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {new Date(provider.flaggedDate).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={`${daysPending} days`}
+                                                        color={daysPending > 7 ? 'error' : daysPending > 3 ? 'warning' : 'default'}
+                                                        size="small"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={provider.networkImpact}
+                                                        color={getNetworkImpactColor(provider.networkImpact)}
+                                                        size="small"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={1}>
+                                                        <Tooltip title="View Details">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleProviderClick(provider);
+                                                                }}
+                                                            >
+                                                                <ViewIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Generate Report">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={handleGenerateReport}
+                                                                sx={{ color: 'info.main' }}
+                                                            >
+                                                                <ReportIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Chat with AI">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handleChatOpen(provider, e)}
+                                                                sx={{ color: 'primary.main' }}
+                                                            >
+                                                                <ChatIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Approve">
+                                                            <IconButton
+                                                                size="small"
+                                                                color="success"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleApprovalClick(provider, 'approve');
+                                                                }}
+                                                            >
+                                                                <ThumbUpIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Deny">
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleApprovalClick(provider, 'deny');
+                                                                }}
+                                                            >
+                                                                <ThumbDownIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+
+                        {filteredProviders.length === 0 && (
+                            <Box sx={{ p: 3, textAlign: 'center' }}>
+                                <Alert severity="info">
+                                    No applications are currently pending committee review.
+                                </Alert>
+                            </Box>
+                        )}
+                    </Paper>
+
+                    {/* Provider Details Dialog */}
+                    <ProviderDetailsDialog
+                        open={dialogOpen}
+                        onClose={() => setDialogOpen(false)}
+                        provider={selectedProvider}
+                        onUpdate={handleProviderUpdate}
+                        userRole="committee"
+                    />
+
+                    {/* Approval/Denial Dialog */}
+                    <Dialog
+                        open={approvalDialogOpen}
+                        onClose={() => setApprovalDialogOpen(false)}
+                        maxWidth="md"
+                        fullWidth
+                    >
+                        <DialogTitle>
+                            {approvalData.decision === 'approve' ? 'Approve' : 'Deny'} Application
+                            {approvalProvider && (
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    {approvalProvider.name} ({approvalProvider.id})
+                                </Typography>
+                            )}
+                        </DialogTitle>
+                        <DialogContent>
+                            <Box sx={{ pt: 2 }}>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={4}
+                                    label="Committee Comments"
+                                    value={approvalData.comments}
+                                    onChange={(e) => setApprovalData(prev => ({ ...prev, comments: e.target.value }))}
+                                    placeholder={`Enter comments for this ${approvalData.decision} decision...`}
+                                    sx={{ mb: 3 }}
+                                />
+
+                                {approvalData.decision === 'approve' && (
+                                    <>
+                                        <Typography variant="h6" gutterBottom>
+                                            Approval Conditions (Optional)
+                                        </Typography>
+                                        <Grid container spacing={2} sx={{ mb: 2 }}>
+                                            {[
+                                                'Complete additional training',
+                                                'Provide updated documentation',
+                                                'Quarterly performance review',
+                                                'Supervised practice period',
+                                                'Additional reference verification'
+                                            ].map((condition) => (
+                                                <Grid item xs={12} sm={6} key={condition}>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={approvalData.conditions.includes(condition)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setApprovalData(prev => ({
+                                                                            ...prev,
+                                                                            conditions: [...prev.conditions, condition]
+                                                                        }));
+                                                                    } else {
+                                                                        setApprovalData(prev => ({
+                                                                            ...prev,
+                                                                            conditions: prev.conditions.filter(c => c !== condition)
+                                                                        }));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={condition}
+                                                    />
+                                                </Grid>
+                                            ))}
+                                        </Grid>
+
+                                        <Divider sx={{ my: 2 }} />
+
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={approvalData.followUpRequired}
+                                                    onChange={(e) => setApprovalData(prev => ({
+                                                        ...prev,
+                                                        followUpRequired: e.target.checked
+                                                    }))}
+                                                />
+                                            }
+                                            label="Require follow-up review in 90 days"
+                                        />
+                                    </>
+                                )}
+                            </Box>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setApprovalDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="contained"
+                                onClick={handleApprovalSubmit}
+                                color={approvalData.decision === 'approve' ? 'success' : 'error'}
+                                startIcon={<SendIcon />}
+                                disabled={!approvalData.comments.trim()}
+                            >
+                                {approvalData.decision === 'approve' ? 'Approve' : 'Deny'} Application
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
+
+                    {/* Credentialing Report Dialog */}
+                    <Dialog
+                        open={reportDialogOpen}
+                        onClose={handleReportClose}
+                        maxWidth="lg"
+                        fullWidth
+                        PaperProps={{
+                            sx: { minHeight: '80vh' }
+                        }}
+                    >
+                        <DialogTitle>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box>
+                                    <Typography variant="h6">Credentialing Report</Typography>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        Provider ID: dr_williams_003
+                                    </Typography>
+                                </Box>
+                                {reportData && (
+                                    <Button
+                                        startIcon={<DownloadIcon />}
+                                        onClick={downloadReport}
+                                        variant="outlined"
+                                        size="small"
+                                    >
+                                        Download Report
+                                    </Button>
+                                )}
+                            </Box>
+                        </DialogTitle>
+                        <DialogContent>
+                            {reportLoading && (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                                    <CircularProgress />
+                                    <Typography sx={{ ml: 2 }}>Generating credentialing report...</Typography>
+                                </Box>
+                            )}
+
+                            {reportError && (
+                                <Alert severity="error" sx={{ mb: 2 }}>
+                                    {reportError}
+                                </Alert>
+                            )}
+
+                            {reportData && (
+                                <Box sx={{ pt: 2 }}>
+                                    {/* Executive Summary */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Executive Summary
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={12} md={6}>
+                                                <Box sx={{ mb: 2 }}>
+                                                    <Typography variant="subtitle2" color="text.secondary">
+                                                        Compliance Status
+                                                    </Typography>
+                                                    <Chip
+                                                        label={reportData.result?.compliance_status || 'UNKNOWN'}
+                                                        color={reportData.result?.compliance_status === 'COMPLIANT' ? 'success' : 'error'}
+                                                        sx={{ mt: 1 }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ mb: 2 }}>
+                                                    <Typography variant="subtitle2" color="text.secondary">
+                                                        Overall Score
+                                                    </Typography>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold', mt: 1 }}>
+                                                        {reportData.result?.overall_score || reportData.result?.score || 'N/A'}/5
+                                                    </Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="subtitle2" color="text.secondary">
+                                                        Compliance
+                                                    </Typography>
+                                                    <Chip
+                                                        label={reportData.result?.is_compliant ? 'COMPLIANT' : 'NON-COMPLIANT'}
+                                                        color={reportData.result?.is_compliant ? 'success' : 'error'}
+                                                        sx={{ mt: 1 }}
+                                                    />
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                    Processing Details
+                                                </Typography>
+                                                <Box component="ul" sx={{ pl: 2, mt: 1 }}>
+                                                    <Typography component="li" variant="body2" sx={{ mb: 0.5 }}>
+                                                        Processing Time: {reportData.result?.processing_time?.toFixed(2) || 'N/A'}s
+                                                    </Typography>
+                                                    <Typography component="li" variant="body2" sx={{ mb: 0.5 }}>
+                                                        Provider ID: {reportData.provider_id}
+                                                    </Typography>
+                                                    <Typography component="li" variant="body2" sx={{ mb: 0.5 }}>
+                                                        Report Generated: {reportData.result?.timestamp ? new Date(reportData.result.timestamp).toLocaleString() : 'N/A'}
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+
+                                    {/* Hard Regulations */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Hard Regulations Analysis
+                                        </Typography>
+                                        {reportData.result?.hard_regulations && (
+                                            <TableContainer component={Paper} variant="outlined">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Regulation ID</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                            <TableCell>Details</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {Object.entries(reportData.result.hard_regulations).map(([regId, passed]) => (
+                                                            <TableRow key={regId}>
+                                                                <TableCell>{regId}</TableCell>
+                                                                <TableCell>
+                                                                    <Chip
+                                                                        label={passed ? 'PASS' : 'FAIL'}
+                                                                        color={passed ? 'success' : 'error'}
+                                                                        size="small"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">
+                                                                        {reportData.result.mapped_data?.[regId]?.reasoning || 'No details available'}
+                                                                    </Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                        )}
+                                    </Paper>
+
+                                    {/* Soft Regulations */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Soft Regulations Scoring
+                                        </Typography>
+                                        {reportData.result?.soft_regulations && (
+                                            <TableContainer component={Paper} variant="outlined">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Regulation ID</TableCell>
+                                                            <TableCell>Score</TableCell>
+                                                            <TableCell>Details</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {Object.entries(reportData.result.soft_regulations).map(([regId, score]) => (
+                                                            <TableRow key={regId}>
+                                                                <TableCell>{regId}</TableCell>
+                                                                <TableCell>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                                        <Typography variant="h6" sx={{ fontWeight: 'bold', mr: 1 }}>
+                                                                            {score}
+                                                                        </Typography>
+                                                                        <Typography variant="body2" color="text.secondary">
+                                                                            /5
+                                                                        </Typography>
+                                                                    </Box>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">
+                                                                        {reportData.result.mapped_data?.[regId]?.reasoning || 'No details available'}
+                                                                    </Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                        )}
+                                    </Paper>
+
+                                    {/* Verification Details */}
+                                    {reportData.result?.verification_details && (
+                                        <Paper sx={{ p: 3, mb: 3 }}>
+                                            <Typography variant="h6" gutterBottom>
+                                                Verification Status
+                                            </Typography>
+                                            <Grid container spacing={2}>
+                                                {reportData.result.verification_details.api_response && 
+                                                 Object.entries(reportData.result.verification_details.api_response).map(([key, value]) => (
+                                                    <Grid item xs={12} sm={6} md={4} key={key}>
+                                                        <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                                            <Typography variant="subtitle2" sx={{ textTransform: 'capitalize' }}>
+                                                                {key.replace(/_/g, ' ')}
+                                                            </Typography>
+                                                            <Chip
+                                                                label={value}
+                                                                color={value === 'Verified' || value === 'Active' || value === 'Clean' || value === 'Passed' || value === 'Confirmed' ? 'success' : 'default'}
+                                                                size="small"
+                                                                sx={{ mt: 1 }}
+                                                            />
+                                                        </Box>
+                                                    </Grid>
+                                                ))}
+                                            </Grid>
+                                        </Paper>
+                                    )}
+
+                                    {/* Report Content */}
+                                    {reportData.report_content && (
+                                        <Paper sx={{ p: 3 }}>
+                                            <Typography variant="h6" gutterBottom>
+                                                Detailed Report
+                                            </Typography>
+                                            <Box sx={{ 
+                                                maxHeight: 400, 
+                                                overflow: 'auto', 
+                                                bgcolor: '#f5f5f5', 
+                                                p: 2, 
+                                                borderRadius: 1,
+                                                fontFamily: 'monospace',
+                                                fontSize: '0.8rem',
+                                                whiteSpace: 'pre-wrap'
+                                            }}>
+                                                {reportData.report_content}
+                                            </Box>
+                                        </Paper>
+                                    )}
+                                </Box>
+                            )}
+
+                                    {/* Process Overview */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Process Overview
+                                        </Typography>
+                                        <Grid container spacing={3}>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {reportData.report.process_overview.total_steps}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Total Steps
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {reportData.report.process_overview.processing_time}s
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Processing Time
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {reportData.report.process_overview.llm_interactions}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        LLM Interactions
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                                        Data Mapping
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Excellent Quality
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+
+                                    {/* Hard Regulations */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Hard Regulations Analysis
+                                        </Typography>
+                                        <Grid container spacing={2} sx={{ mb: 2 }}>
+                                            <Grid item xs={4}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                                        {reportData.report.hard_regulations.passed_regulations}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Passed
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                        {reportData.report.hard_regulations.failed_regulations}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Failed
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                                                        {reportData.report.hard_regulations.total_regulations}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Total
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                        </Grid>
+
+                                        {reportData.report.hard_regulations.detailed_analysis && reportData.report.hard_regulations.detailed_analysis.length > 0 && (
+                                            <TableContainer component={Paper} variant="outlined">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Regulation ID</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                            <TableCell>Confidence</TableCell>
+                                                            <TableCell>Reasoning</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {reportData.report.hard_regulations.detailed_analysis.map((regulation, index) => (
+                                                            <TableRow key={index}>
+                                                                <TableCell>{regulation.regulation_id}</TableCell>
+                                                                <TableCell>
+                                                                    <Chip
+                                                                        label={regulation.status}
+                                                                        color={regulation.status === 'PASS' ? 'success' : 'error'}
+                                                                        size="small"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">
+                                                                        {Math.round(regulation.confidence * 100)}%
+                                                                    </Typography>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">
+                                                                        {regulation.reasoning}
+                                                                    </Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                        )}
+                                    </Paper>
+
+                                    {/* Soft Regulations */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Soft Regulations Scoring
+                                        </Typography>
+                                        <Box sx={{ mb: 2 }}>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                                                {reportData.report.soft_regulations.average_score}/5
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                                                Average Score (Total: {reportData.report.soft_regulations.total_possible_score} possible)
+                                            </Typography>
+                                        </Box>
+
+                                        {reportData.report.soft_regulations.detailed_scoring && reportData.report.soft_regulations.detailed_scoring.length > 0 && (
+                                            <TableContainer component={Paper} variant="outlined">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Regulation ID</TableCell>
+                                                            <TableCell>Score</TableCell>
+                                                            <TableCell>Max Score</TableCell>
+                                                            <TableCell>Reasoning</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {reportData.report.soft_regulations.detailed_scoring.map((regulation, index) => (
+                                                            <TableRow key={index}>
+                                                                <TableCell>{regulation.regulation_id}</TableCell>
+                                                                <TableCell>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                                        <Typography variant="h6" sx={{ fontWeight: 'bold', mr: 1 }}>
+                                                                            {regulation.score}
+                                                                        </Typography>
+                                                                        <Typography variant="body2" color="text.secondary">
+                                                                            /{regulation.max_score}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                </TableCell>
+                                                                <TableCell>{regulation.max_score}</TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">
+                                                                        {regulation.reasoning}
+                                                                    </Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                        )}
+                                    </Paper>
+
+                                    {/* Data Quality */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Data Quality Analysis
+                                        </Typography>
+                                        <Grid container spacing={3}>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {Math.round(reportData.report.data_quality.completeness_score * 100)}%
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Completeness
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {Math.round(reportData.report.data_quality.mapping_accuracy * 100)}%
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Mapping Accuracy
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {Math.round(reportData.report.data_quality.verification_success * 100)}%
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Verification Success
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                            <Grid item xs={6} md={3}>
+                                                <Box sx={{ textAlign: 'center' }}>
+                                                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                        {reportData.report.data_quality.quality_issues.length}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Quality Issues
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+                                        </Grid>
+
+                                        {reportData.report.data_quality.quality_issues.length > 0 && (
+                                            <Box sx={{ mt: 2 }}>
+                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                    Quality Issues
+                                                </Typography>
+                                                <Box component="ul" sx={{ pl: 2 }}>
+                                                    {reportData.report.data_quality.quality_issues.map((issue, index) => (
+                                                        <Typography component="li" key={index} variant="body2" sx={{ mb: 0.5 }}>
+                                                            {issue}
+                                                        </Typography>
+                                                    ))}
+                                                </Box>
+                                            </Box>
+                                        )}
+                                    </Paper>
+
+                                    {/* Recommendations */}
+                                    <Paper sx={{ p: 3, mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Recommendations
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            {reportData.report.recommendations.immediate_actions.length > 0 && (
+                                                <Grid item xs={12} md={6}>
+                                                    <Typography variant="subtitle2" color="error.main" gutterBottom>
+                                                        Immediate Actions Required
+                                                    </Typography>
+                                                    <Box component="ul" sx={{ pl: 2 }}>
+                                                        {reportData.report.recommendations.immediate_actions.map((action, index) => (
+                                                            <Typography component="li" key={index} variant="body2" sx={{ mb: 0.5 }}>
+                                                                {action}
+                                                            </Typography>
+                                                        ))}
+                                                    </Box>
+                                                </Grid>
+                                            )}
+                                            {reportData.report.recommendations.improvement_areas.length > 0 && (
+                                                <Grid item xs={12} md={6}>
+                                                    <Typography variant="subtitle2" color="warning.main" gutterBottom>
+                                                        Areas for Improvement
+                                                    </Typography>
+                                                    <Box component="ul" sx={{ pl: 2 }}>
+                                                        {reportData.report.recommendations.improvement_areas.map((area, index) => (
+                                                            <Typography component="li" key={index} variant="body2" sx={{ mb: 0.5 }}>
+                                                                {area}
+                                                            </Typography>
+                                                        ))}
+                                                    </Box>
+                                                </Grid>
+                                            )}
+                                            {reportData.report.recommendations.follow_up_required.length > 0 && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="subtitle2" color="info.main" gutterBottom>
+                                                        Follow-up Required
+                                                    </Typography>
+                                                    <Box component="ul" sx={{ pl: 2 }}>
+                                                        {reportData.report.recommendations.follow_up_required.map((followUp, index) => (
+                                                            <Typography component="li" key={index} variant="body2" sx={{ mb: 0.5 }}>
+                                                                {followUp}
+                                                            </Typography>
+                                                        ))}
+                                                    </Box>
+                                                </Grid>
+                                            )}
+                                            <Grid item xs={12}>
+                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                    Timeline
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {reportData.report.recommendations.timeline}
+                                                </Typography>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+
+                                    {/* Technical Details */}
+                                    <Paper sx={{ p: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Technical Details
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    LLM Requests
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                                    {reportData.report.technical_details.llm_requests}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    LLM Tokens
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                                    {reportData.report.technical_details.llm_tokens}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    LLM Cost
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                                    ${reportData.report.technical_details.llm_cost}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    Processing Time
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                                    {reportData.report.technical_details.processing_time}s
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    Errors
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                                    {reportData.report.technical_details.errors_encountered}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={6} md={2}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    Model
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    Claude 3 Sonnet
+                                                </Typography>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+                                </Box>
+                            )}
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={handleReportClose}>Close</Button>
+                            {reportData && (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<DownloadIcon />}
+                                    onClick={downloadReport}
+                                >
+                                    Download Report
+                                </Button>
+                            )}
+                        </DialogActions>
+                    </Dialog>
+
+                    {/* Provider Chat Sidebar */}
+                    <ProviderChatSidebar
+                        open={chatOpen}
+                        onClose={handleChatClose}
+                        provider={chatProvider}
+                    />
+                </Box>
+            )}
+
+            {/* Roster Intake Tab */}
+            {tabValue === 1 && (
+                <Box>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 4, textAlign: 'center' }}>
+                                <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+                                    Roster Automation Intake
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
+                                    Upload your roster automation Excel file to automatically process and add provider applications to the credentialing system.
+                                </Typography>
+
+                                {/* File Upload Section */}
+                                <Box sx={{ mb: 4 }}>
+                                    <input
+                                        accept=".xlsx,.xls,.csv"
+                                        style={{ display: 'none' }}
+                                        id="roster-file-input"
+                                        type="file"
+                                        onChange={handleFileUpload}
+                                    />
+                                    <label htmlFor="roster-file-input">
+                                        <Button
+                                            variant="outlined"
+                                            component="span"
+                                            size="large"
+                                            startIcon={<UploadIcon />}
+                                            sx={{ mr: 2, mb: 2 }}
+                                        >
+                                            Choose Excel File
+                                        </Button>
+                                    </label>
+
+                                    {rosterFile && (
+                                        <Box sx={{ mt: 2, mb: 3 }}>
+                                            <Chip
+                                                icon={<FileIcon />}
+                                                label={rosterFile.name}
+                                                color="primary"
+                                                variant="outlined"
+                                                sx={{ fontSize: '0.9rem', py: 2 }}
+                                            />
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                {/* Process Button */}
+                                <Box sx={{ mb: 4 }}>
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        onClick={processRosterFile}
+                                        disabled={!rosterFile || rosterLoading}
+                                        startIcon={rosterLoading ? <CircularProgress size={20} /> : <AssignmentIcon />}
+                                        sx={{ minWidth: 200 }}
+                                    >
+                                        {rosterLoading ? 'Processing...' : 'Process Roster File'}
+                                    </Button>
+                                </Box>
+
+                                {/* Loading Progress */}
+                                {rosterLoading && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                            Processing roster file and creating provider applications...
+                                        </Typography>
+                                        <LinearProgress />
+                                    </Box>
+                                )}
+
+                                {/* Success Message */}
+                                {rosterSuccess && (
+                                    <Alert severity="success" sx={{ mb: 3, textAlign: 'left' }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Roster Processing Complete!
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Successfully added 3 provider applications from the roster file:
+                                        </Typography>
+                                        <Box component="ul" sx={{ mt: 1, mb: 0 }}>
+                                            <Typography component="li" variant="body2">Dr. Sarah Johnson - Internal Medicine</Typography>
+                                            <Typography component="li" variant="body2">Dr. Michael Chen - Cardiology</Typography>
+                                            <Typography component="li" variant="body2">Dr. Emily Rodriguez - Pediatrics</Typography>
+                                        </Box>
+                                        <Typography variant="body2" sx={{ mt: 2 }}>
+                                            You can now view these applications in the Applications tab or Committee Review section.
+                                        </Typography>
+                                    </Alert>
+                                )}
+
+                                {/* Instructions */}
+                                <Paper variant="outlined" sx={{ p: 3, mt: 4, textAlign: 'left' }}>
+                                    <Typography variant="h6" gutterBottom>
+                                        File Requirements
+                                    </Typography>
+                                    <Box component="ul" sx={{ mb: 2 }}>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            Supported formats: .xlsx, .xls, .csv
+                                        </Typography>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            File should contain provider information with standard roster columns
+                                        </Typography>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            Maximum file size: 10MB
+                                        </Typography>
+                                        <Typography component="li" variant="body2">
+                                            Processing will create new provider applications automatically
+                                        </Typography>
+                                    </Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                    </Typography>
+                                </Paper>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </Box>
+            )}
+        </Box>
+    );
+
+            {/* Roster Intake Tab */}
+            {tabValue === 1 && (
+                <Box>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 4, textAlign: 'center' }}>
+                                <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+                                    Roster Automation Intake
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
+                                    Upload your roster automation Excel file to automatically process and add provider applications to the credentialing system.
+                                </Typography>
+
+                                {/* File Upload Section */}
+                                <Box sx={{ mb: 4 }}>
+                                    <input
+                                        accept=".xlsx,.xls,.csv"
+                                        style={{ display: 'none' }}
+                                        id="roster-file-input"
+                                        type="file"
+                                        onChange={handleFileUpload}
+                                    />
+                                    <label htmlFor="roster-file-input">
+                                        <Button
+                                            variant="outlined"
+                                            component="span"
+                                            size="large"
+                                            startIcon={<UploadIcon />}
+                                            sx={{ mr: 2, mb: 2 }}
+                                        >
+                                            Choose Excel File
+                                        </Button>
+                                    </label>
+
+                                    {rosterFile && (
+                                        <Box sx={{ mt: 2, mb: 3 }}>
+                                            <Chip
+                                                icon={<FileIcon />}
+                                                label={rosterFile.name}
+                                                color="primary"
+                                                variant="outlined"
+                                                sx={{ fontSize: '0.9rem', py: 2 }}
+                                            />
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                {/* Process Button */}
+                                <Box sx={{ mb: 4 }}>
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        onClick={processRosterFile}
+                                        disabled={!rosterFile || rosterLoading}
+                                        startIcon={rosterLoading ? <CircularProgress size={20} /> : <AssignmentIcon />}
+                                        sx={{ minWidth: 200 }}
+                                    >
+                                        {rosterLoading ? 'Processing...' : 'Process Roster File'}
+                                    </Button>
+                                </Box>
+
+                                {/* Loading Progress */}
+                                {rosterLoading && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                            Processing roster file and creating provider applications...
+                                        </Typography>
+                                        <LinearProgress />
+                                    </Box>
+                                )}
+
+                                {/* Success Message */}
+                                {rosterSuccess && (
+                                    <Alert severity="success" sx={{ mb: 3, textAlign: 'left' }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Roster Processing Complete!
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Successfully added 3 provider applications from the roster file:
+                                        </Typography>
+                                        <Box component="ul" sx={{ mt: 1, mb: 0 }}>
+                                            <Typography component="li" variant="body2">Dr. Sarah Johnson - Internal Medicine</Typography>
+                                            <Typography component="li" variant="body2">Dr. Michael Chen - Cardiology</Typography>
+                                            <Typography component="li" variant="body2">Dr. Emily Rodriguez - Pediatrics</Typography>
+                                        </Box>
+                                        <Typography variant="body2" sx={{ mt: 2 }}>
+                                            You can now view these applications in the Applications tab or Committee Review section.
+                                        </Typography>
+                                    </Alert>
+                                )}
+
+                                {/* Instructions */}
+                                <Paper variant="outlined" sx={{ p: 3, mt: 4, textAlign: 'left' }}>
+                                    <Typography variant="h6" gutterBottom>
+                                        File Requirements
+                                    </Typography>
+                                    <Box component="ul" sx={{ mb: 2 }}>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            Supported formats: .xlsx, .xls, .csv
+                                        </Typography>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            File should contain provider information with standard roster columns
+                                        </Typography>
+                                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                            Maximum file size: 10MB
+                                        </Typography>
+                                        <Typography component="li" variant="body2">
+                                            Processing will create new provider applications automatically
+                                        </Typography>
+                                    </Box>
+                                    <Typography variant="body2" color="text.secondary">
+
+                                    </Typography>
+                                </Paper>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+export default CommitteeReview;

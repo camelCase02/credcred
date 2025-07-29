@@ -1,0 +1,343 @@
+{
+  "providers": [
+    {
+      "provider_id": "dr_smith_001",
+      "PersonalInfo": {
+        "name": "Dr. Sarah Smith",
+        "date_of_birth": "1980-05-15",
+        "ssn": "123-45-6789",
+        "email": "sarah.smith@healthcare.com",
+        "phone": "(555) 123-4567"
+      },
+      "ProfessionalIds": {
+        "license_number": "MD123456",
+        "dea_number": "BS1234567",
+        "npi": "1234567890",
+        "state_license": "CA123456",
+        "federal_tax_id": "12-3456789"
+      },
+      "Educations": {
+        "medical_school": "Stanford University School of Medicine",
+        "graduation_year": 2008,
+        "residency": "Internal Medicine - UCSF Medical Center",
+        "fellowship": "Cardiology - Johns Hopkins Hospital",
+        "undergraduate": "UC Berkeley"
+      },
+      "Specialties": {
+        "primary_specialty": "Cardiology",
+        "subspecialties": ["Interventional Cardiology", "Heart Failure"],
+        "certifications": ["FACC", "FSCAI"]
+      },
+      "HospitalAffiliations": {
+        "hospitals": ["UCSF Medical Center", "Stanford Hospital"],
+        "privileges": ["Cardiology", "Interventional Procedures"],
+        "admitting_privileges": true
+      },
+      "WorkHistory": {
+        "employment_history": [
+          {
+            "position": "Cardiologist",
+            "institution": "UCSF Medical Center",
+            "start_date": "2013-07-01",
+            "end_date": null,
+            "current": true
+          }
+        ],
+        "years_experience": 15
+      },
+      "PLIs": {
+        "malpractice_insurance": "Active",
+        "coverage_amount": 1000000,
+        "insurance_provider": "Medical Protective",
+        "policy_number": "MP123456",
+        "expiration_date": "2024-12-31"
+      },
+      "PracticeInformation": {
+        "practice_name": "UCSF Cardiology Associates",
+        "practice_address": "505 Parnassus Ave, San Francisco, CA 94143",
+        "practice_phone": "(555) 987-6543",
+        "practice_website": "https://cardiology.ucsf.edu"
+      },
+      "MalpracticeHistory": {
+        "malpractice_claims": 0,
+        "settlements": 0,
+        "pending_claims": 0,
+        "last_claim_date": null
+      },
+      "Disclosure": {
+        "disciplinary_actions": [],
+        "criminal_record": "Clean",
+        "license_suspensions": 0,
+        "voluntary_surrender": false
+      },
+      "BoardCertifications": {
+        "board_certifications": ["American Board of Internal Medicine", "American Board of Internal Medicine - Cardiovascular Disease"],
+        "certification_dates": ["2011-06-15", "2014-08-20"],
+        "expiration_dates": ["2021-06-15", "2024-08-20"],
+        "recertification_status": "Current"
+      },
+      "ContinuingEducation": {
+        "cme_credits": 75,
+        "education_history": [
+          {
+            "course": "Advanced Cardiac Life Support",
+            "credits": 8,
+            "date": "2023-12-01"
+          }
+        ],
+        "required_credits": 50,
+        "compliance_status": "Compliant"
+      },
+      "PeerReferences": {
+        "references": [
+          {
+            "name": "Dr. Michael Johnson",
+            "title": "Chief of Cardiology",
+            "institution": "UCSF Medical Center",
+            "relationship": "Colleague"
+          }
+        ],
+        "peer_evaluations": "Excellent"
+      },
+      "FinancialDisclosure": {
+        "financial_interests": [],
+        "conflicts": "None disclosed",
+        "pharmaceutical_relationships": "None",
+        "device_company_relationships": "None"
+      },
+      "QualityMetrics": {
+        "patient_satisfaction": 4.8,
+        "outcome_metrics": 4.9,
+        "readmission_rate": 0.05,
+        "mortality_rate": 0.02,
+        "quality_score": 4.85
+      }
+    },
+    {
+      "provider_id": "dr_johnson_002",
+      "PersonalInfo": {
+        "name": "Dr. Robert Johnson",
+        "date_of_birth": "1975-03-22",
+        "ssn": "234-56-7890",
+        "email": "robert.johnson@healthcare.com",
+        "phone": "(555) 234-5678"
+      },
+      "ProfessionalIds": {
+        "license_number": "MD234567",
+        "dea_number": "BS2345678",
+        "npi": "2345678901",
+        "state_license": "CA234567",
+        "federal_tax_id": "23-4567890"
+      },
+      "Educations": {
+        "medical_school": "Harvard Medical School",
+        "graduation_year": 2003,
+        "residency": "General Surgery - Massachusetts General Hospital",
+        "fellowship": "Surgical Oncology - Memorial Sloan Kettering",
+        "undergraduate": "Yale University"
+      },
+      "Specialties": {
+        "primary_specialty": "Surgical Oncology",
+        "subspecialties": ["Breast Cancer Surgery", "Minimally Invasive Surgery"],
+        "certifications": ["FACS"]
+      },
+      "HospitalAffiliations": {
+        "hospitals": ["Cedars-Sinai Medical Center", "UCLA Medical Center"],
+        "privileges": ["General Surgery", "Oncologic Surgery"],
+        "admitting_privileges": true
+      },
+      "WorkHistory": {
+        "employment_history": [
+          {
+            "position": "Surgical Oncologist",
+            "institution": "Cedars-Sinai Medical Center",
+            "start_date": "2010-09-01",
+            "end_date": null,
+            "current": true
+          }
+        ],
+        "years_experience": 20
+      },
+      "PLIs": {
+        "malpractice_insurance": "Active",
+        "coverage_amount": 2000000,
+        "insurance_provider": "The Doctors Company",
+        "policy_number": "TDC234567",
+        "expiration_date": "2024-12-31"
+      },
+      "PracticeInformation": {
+        "practice_name": "Cedars-Sinai Surgical Oncology",
+        "practice_address": "8700 Beverly Blvd, Los Angeles, CA 90048",
+        "practice_phone": "(555) 876-5432",
+        "practice_website": "https://surgery.cedars-sinai.edu"
+      },
+      "MalpracticeHistory": {
+        "malpractice_claims": 1,
+        "settlements": 1,
+        "pending_claims": 0,
+        "last_claim_date": "2018-06-15"
+      },
+      "Disclosure": {
+        "disciplinary_actions": [],
+        "criminal_record": "Clean",
+        "license_suspensions": 0,
+        "voluntary_surrender": false
+      },
+      "BoardCertifications": {
+        "board_certifications": ["American Board of Surgery"],
+        "certification_dates": ["2009-07-10"],
+        "expiration_dates": ["2019-07-10"],
+        "recertification_status": "Current"
+      },
+      "ContinuingEducation": {
+        "cme_credits": 60,
+        "education_history": [
+          {
+            "course": "Advanced Trauma Life Support",
+            "credits": 16,
+            "date": "2023-11-15"
+          }
+        ],
+        "required_credits": 50,
+        "compliance_status": "Compliant"
+      },
+      "PeerReferences": {
+        "references": [
+          {
+            "name": "Dr. Lisa Chen",
+            "title": "Chief of Surgery",
+            "institution": "Cedars-Sinai Medical Center",
+            "relationship": "Supervisor"
+          }
+        ],
+        "peer_evaluations": "Very Good"
+      },
+      "FinancialDisclosure": {
+        "financial_interests": ["Minor stock in Johnson & Johnson"],
+        "conflicts": "Disclosed",
+        "pharmaceutical_relationships": "None",
+        "device_company_relationships": "None"
+      },
+      "QualityMetrics": {
+        "patient_satisfaction": 4.6,
+        "outcome_metrics": 4.7,
+        "readmission_rate": 0.08,
+        "mortality_rate": 0.03,
+        "quality_score": 4.65
+      }
+    },
+    {
+      "provider_id": "dr_williams_003",
+      "PersonalInfo": {
+        "name": "Dr. Emily Williams",
+        "date_of_birth": "1985-11-08",
+        "ssn": "345-67-8901",
+        "email": "emily.williams@healthcare.com",
+        "phone": "(555) 345-6789"
+      },
+      "ProfessionalIds": {
+        "license_number": "MD345678",
+        "dea_number": "BS3456789",
+        "npi": "3456789012",
+        "state_license": "CA345678",
+        "federal_tax_id": "34-5678901"
+      },
+      "Educations": {
+        "medical_school": "UCLA David Geffen School of Medicine",
+        "graduation_year": 2012,
+        "residency": "Pediatrics - Children's Hospital Los Angeles",
+        "fellowship": "Pediatric Emergency Medicine - Boston Children's Hospital",
+        "undergraduate": "UC San Diego"
+      },
+      "Specialties": {
+        "primary_specialty": "Pediatric Emergency Medicine",
+        "subspecialties": ["Pediatric Trauma", "Pediatric Critical Care"],
+        "certifications": ["FAAP", "FACEP"]
+      },
+      "HospitalAffiliations": {
+        "hospitals": ["Children's Hospital Los Angeles", "UCLA Mattel Children's Hospital"],
+        "privileges": ["Pediatrics", "Emergency Medicine"],
+        "admitting_privileges": true
+      },
+      "WorkHistory": {
+        "employment_history": [
+          {
+            "position": "Pediatric Emergency Physician",
+            "institution": "Children's Hospital Los Angeles",
+            "start_date": "2018-07-01",
+            "end_date": null,
+            "current": true
+          }
+        ],
+        "years_experience": 11
+      },
+      "PLIs": {
+        "malpractice_insurance": "Active",
+        "coverage_amount": 1500000,
+        "insurance_provider": "ProAssurance",
+        "policy_number": "PA345678",
+        "expiration_date": "2024-12-31"
+      },
+      "PracticeInformation": {
+        "practice_name": "CHLA Emergency Department",
+        "practice_address": "4650 Sunset Blvd, Los Angeles, CA 90027",
+        "practice_phone": "(555) 765-4321",
+        "practice_website": "https://www.chla.org"
+      },
+      "MalpracticeHistory": {
+        "malpractice_claims": 0,
+        "settlements": 0,
+        "pending_claims": 0,
+        "last_claim_date": null
+      },
+      "Disclosure": {
+        "disciplinary_actions": [],
+        "criminal_record": "Clean",
+        "license_suspensions": 0,
+        "voluntary_surrender": false
+      },
+      "BoardCertifications": {
+        "board_certifications": ["American Board of Pediatrics", "American Board of Emergency Medicine"],
+        "certification_dates": ["2015-10-20", "2016-05-15"],
+        "expiration_dates": ["2025-10-20", "2026-05-15"],
+        "recertification_status": "Current"
+      },
+      "ContinuingEducation": {
+        "cme_credits": 85,
+        "education_history": [
+          {
+            "course": "Pediatric Advanced Life Support",
+            "credits": 12,
+            "date": "2023-10-01"
+          }
+        ],
+        "required_credits": 50,
+        "compliance_status": "Compliant"
+      },
+      "PeerReferences": {
+        "references": [
+          {
+            "name": "Dr. David Rodriguez",
+            "title": "Medical Director, Emergency Department",
+            "institution": "Children's Hospital Los Angeles",
+            "relationship": "Supervisor"
+          }
+        ],
+        "peer_evaluations": "Outstanding"
+      },
+      "FinancialDisclosure": {
+        "financial_interests": [],
+        "conflicts": "None disclosed",
+        "pharmaceutical_relationships": "None",
+        "device_company_relationships": "None"
+      },
+      "QualityMetrics": {
+        "patient_satisfaction": 4.9,
+        "outcome_metrics": 4.8,
+        "readmission_rate": 0.03,
+        "mortality_rate": 0.01,
+        "quality_score": 4.85
+      }
+    }
+  ]
+} 

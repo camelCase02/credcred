@@ -1,0 +1,110 @@
+{
+  "regulations": {
+    "hard_regulations": [
+      {
+        "id": "HR001",
+        "name": "Valid Medical License",
+        "description": "Provider must have a valid, active medical license in the state of practice",
+        "data_fields": ["ProfessionalIds"],
+        "validation_criteria": {
+          "license_status": "Active",
+          "license_expiration": "Not expired",
+          "state_verification": "Verified"
+        },
+        "failure_consequence": "Immediate disqualification"
+      },
+      {
+        "id": "HR002",
+        "name": "No Active Disciplinary Actions",
+        "description": "Provider must not have any active disciplinary actions or license suspensions",
+        "data_fields": ["Disclosure"],
+        "validation_criteria": {
+          "disciplinary_actions": "None",
+          "license_suspensions": 0,
+          "voluntary_surrender": false
+        },
+        "failure_consequence": "Immediate disqualification"
+      },
+      {
+        "id": "HR003",
+        "name": "Current Malpractice Insurance",
+        "description": "Provider must have active professional liability insurance with adequate coverage",
+        "data_fields": ["PLIs"],
+        "validation_criteria": {
+          "malpractice_insurance": "Active",
+          "coverage_amount": ">= 1000000",
+          "expiration_date": "Not expired"
+        },
+        "failure_consequence": "Immediate disqualification"
+      },
+      {
+        "id": "HR004",
+        "name": "Board Certification",
+        "description": "Provider must be board certified in their primary specialty",
+        "data_fields": ["BoardCertifications"],
+        "validation_criteria": {
+          "board_certifications": "Present",
+          "recertification_status": "Current",
+          "expiration_dates": "Not expired"
+        },
+        "failure_consequence": "Immediate disqualification"
+      },
+      {
+        "id": "HR005",
+        "name": "Clean Criminal Background",
+        "description": "Provider must have a clean criminal background with no felony convictions",
+        "data_fields": ["Disclosure"],
+        "validation_criteria": {
+          "criminal_record": "Clean",
+          "felony_convictions": 0,
+          "background_check": "Passed"
+        },
+        "failure_consequence": "Immediate disqualification"
+      }
+    ],
+    "soft_regulations": [
+      {
+        "id": "SR001",
+        "name": "Years of Experience",
+        "description": "Provider experience level scored based on years of practice",
+        "data_fields": ["WorkHistory"],
+        "scoring_criteria": {
+          "0-2 years": 1,
+          "3-5 years": 2,
+          "6-10 years": 3,
+          "11-15 years": 4,
+          "16+ years": 5
+        },
+        "weight": 0.4
+      },
+      {
+        "id": "SR002",
+        "name": "Continuing Education Compliance",
+        "description": "Provider compliance with continuing medical education requirements",
+        "data_fields": ["ContinuingEducation"],
+        "scoring_criteria": {
+          "0-25 credits": 1,
+          "26-50 credits": 2,
+          "51-75 credits": 3,
+          "76-100 credits": 4,
+          "100+ credits": 5
+        },
+        "weight": 0.3
+      },
+      {
+        "id": "SR003",
+        "name": "Quality Metrics Performance",
+        "description": "Provider performance based on quality metrics and patient outcomes",
+        "data_fields": ["QualityMetrics"],
+        "scoring_criteria": {
+          "0.0-1.0": 1,
+          "1.1-2.0": 2,
+          "2.1-3.0": 3,
+          "3.1-4.0": 4,
+          "4.1-5.0": 5
+        },
+        "weight": 0.3
+      }
+    ]
+  }
+} 

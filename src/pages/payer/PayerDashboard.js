@@ -71,6 +71,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api/api';
+import credentialingApi from '../../services/api/credentialingApi';
 import NetworkAdequacyAnalyzer from '../../components/payer/NetworkAdequacyAnalyzer';
 import NetworkAnalytics from '../../components/payer/NetworkAnalytics';
 import NotificationCenter from '../../components/common/NotificationCenter';
@@ -83,6 +84,12 @@ const PayerDashboard = () => {
     const [selectedNetwork, setSelectedNetwork] = useState('');
     const [providerDialogOpen, setProviderDialogOpen] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState(null);
+
+    // New states for credentialing
+    const [credentialingDialog, setCredentialingDialog] = useState(false);
+    const [credentialingInProgress, setCredentialingInProgress] = useState(false);
+    const [credentialingDetails, setCredentialingDetails] = useState(null);
+
     const { user, logout } = useAuth();
 
     // Fetch data using React Query
@@ -91,9 +98,10 @@ const PayerDashboard = () => {
         queryFn: () => api.getPayerProfile()
     });
 
-    const { data: enrolledProviders } = useQuery({
-        queryKey: ['enrolledProviders'],
-        queryFn: () => api.getEnrolledProviders()
+    // Use new credentialing API for providers
+    const { data: enrolledProviders, refetch: refetchProviders } = useQuery({
+        queryKey: ['providers'],
+        queryFn: () => credentialingApi.getProviders()
     });
 
     const { data: networks } = useQuery({
@@ -106,6 +114,34 @@ const PayerDashboard = () => {
         queryFn: () => api.getProviderSuggestions(selectedNetwork),
         enabled: !!selectedNetwork
     });
+
+    // Handle Start Credentialing
+    const handleStartCredentialing = async (provider) => {
+        setSelectedProvider(provider);
+        setCredentialingDetails(null);
+        setCredentialingDialog(true);
+    };
+
+    // Confirm and start credentialing process
+    const confirmStartCredentialing = async () => {
+        if (!selectedProvider) return;
+
+        setCredentialingInProgress(true);
+        try {
+            const result = await credentialingApi.credentialProvider(selectedProvider.provider_id);
+            setCredentialingDetails(result);
+
+            // Refresh providers list
+            refetchProviders();
+
+            alert(`Credentialing successfully finished for ${selectedProvider.name}`);
+        } catch (error) {
+            console.error('Credentialing error:', error);
+            alert(`Failed to start credentialing: ${error.message}`);
+        } finally {
+            setCredentialingInProgress(false);
+        }
+    };
 
     const handleMenuClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -308,78 +344,122 @@ const PayerDashboard = () => {
         </Grid>
     );
 
-    const renderProvidersTab = () => (
-        <Grid container spacing={3}>
-            <Grid item xs={12}>
-                <Card>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                            Enrolled Providers
-                        </Typography>
-                        <TableContainer>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Provider Name</TableCell>
-                                        <TableCell>Specialty</TableCell>
-                                        <TableCell>Location</TableCell>
-                                        <TableCell>Quality Score</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {enrolledProviders?.data?.map((provider) => (
-                                        <TableRow key={provider.id}>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                                                        {provider.name.charAt(0)}
-                                                    </Avatar>
-                                                    <Typography variant="subtitle2">{provider.name}</Typography>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell>{provider.specialty}</TableCell>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    <LocationOn sx={{ mr: 1, fontSize: 16 }} />
-                                                    {provider.location}
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    <Star sx={{ mr: 1, fontSize: 16, color: 'gold' }} />
-                                                    {provider.qualityScore}
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={provider.acceptingNewPatients ? 'Active' : 'Inactive'}
-                                                    color={provider.acceptingNewPatients ? 'success' : 'default'}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    size="small"
-                                                    onClick={() => {
-                                                        setSelectedProvider(provider);
-                                                        setProviderDialogOpen(true);
-                                                    }}
-                                                >
-                                                    View Details
-                                                </Button>
-                                            </TableCell>
+    const renderProvidersTab = () => {
+        // Use dummy data if API data is not available
+        console.log("Enrolled Providers Data:", enrolledProviders);
+        console.log("Has providers array:", enrolledProviders?.providers && Array.isArray(enrolledProviders.providers));
+
+        const providersData = (enrolledProviders?.providers && Array.isArray(enrolledProviders.providers))
+            ? enrolledProviders.providers
+            : [
+                {
+                    provider_id: "dr_smith_001",
+                    name: "Dr. John Smith",
+                    specialty: "Cardiology",
+                    location: "New York, NY",
+                    quality_score: 4.8,
+                    status: "active",
+                    experience_years: 15
+                },
+                {
+                    provider_id: "dr_johnson_002",
+                    name: "Dr. Sarah Johnson",
+                    specialty: "Pediatrics",
+                    location: "Brooklyn, NY",
+                    quality_score: 4.9,
+                    status: "active",
+                    experience_years: 12
+                },
+                {
+                    provider_id: "dr_chen_003",
+                    name: "Dr. Michael Chen",
+                    specialty: "Orthopedics",
+                    location: "Queens, NY",
+                    quality_score: 4.7,
+                    status: "inactive",
+                    experience_years: 20
+                }
+            ];
+
+        return (
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                Available Providers
+                            </Typography>
+                            <TableContainer>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Provider Name</TableCell>
+                                            <TableCell>Specialty</TableCell>
+                                            <TableCell>Location</TableCell>
+                                            <TableCell>Experience</TableCell>
+                                            <TableCell>Quality Score</TableCell>
+                                            <TableCell>Actions</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
+                                    </TableHead>
+                                    <TableBody>
+                                        {providersData.map((provider) => (
+                                            <TableRow key={provider.provider_id}>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                                                            {provider.name.charAt(0)}
+                                                        </Avatar>
+                                                        <Typography variant="subtitle2">{provider.name}</Typography>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>{provider.specialty}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <LocationOn sx={{ mr: 1, fontSize: 16 }} />
+                                                        {provider.location || provider.practice_name || 'N/A'}
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>{provider.experience_years || provider.years_experience || 'N/A'} years</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <Star sx={{ mr: 1, fontSize: 16, color: 'gold' }} />
+                                                        {provider.quality_score || 'N/A'}
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={1}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            onClick={() => {
+                                                                setSelectedProvider(provider);
+                                                                setProviderDialogOpen(true);
+                                                            }}
+                                                        >
+                                                            View Details
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="primary"
+                                                            onClick={() => handleStartCredentialing(provider)}
+                                                            disabled={credentialingInProgress}
+                                                        >
+                                                            Start Credentialing
+                                                        </Button>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </CardContent>
+                    </Card>
+                </Grid>
             </Grid>
-        </Grid>
-    );
+        );
+    };
 
     const renderSuggestionsTab = () => (
         <Grid container spacing={3}>
@@ -534,7 +614,7 @@ const PayerDashboard = () => {
                                 <TextField
                                     fullWidth
                                     label="Location"
-                                    value={selectedProvider.location}
+                                    value={selectedProvider.location || selectedProvider.practice_name || 'N/A'}
                                     disabled
                                 />
                             </Grid>
@@ -542,34 +622,41 @@ const PayerDashboard = () => {
                                 <TextField
                                     fullWidth
                                     label="Quality Score"
-                                    value={selectedProvider.qualityScore}
+                                    value={selectedProvider.quality_score || selectedProvider.qualityScore || 'N/A'}
                                     disabled
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Patient Capacity"
-                                    value={selectedProvider.patientCapacity}
+                                    label="Provider ID"
+                                    value={selectedProvider.provider_id || 'N/A'}
                                     disabled
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Current Patients"
-                                    value={selectedProvider.currentPatients}
+                                    label="Experience"
+                                    value={selectedProvider.experience_years ? `${selectedProvider.experience_years} years` :
+                                        selectedProvider.years_experience ? `${selectedProvider.years_experience} years` : 'N/A'}
                                     disabled
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Network Impact"
-                                    value={selectedProvider.networkImpact}
+                                    label="Status"
+                                    value={selectedProvider.status || 'Active'}
                                     disabled
-                                    multiline
-                                    rows={3}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Practice Name"
+                                    value={selectedProvider.practice_name || 'N/A'}
+                                    disabled
                                 />
                             </Grid>
                         </Grid>
@@ -577,9 +664,141 @@ const PayerDashboard = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setProviderDialogOpen(false)}>Close</Button>
-                    <Button variant="contained" color="primary">
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => {
+                            setProviderDialogOpen(false);
+                            handleStartCredentialing(selectedProvider);
+                        }}
+                    >
                         Initiate Credentialing
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Credentialing Confirmation Dialog */}
+            <Dialog
+                open={credentialingDialog}
+                onClose={() => setCredentialingDialog(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Start Credentialing Process</DialogTitle>
+                <DialogContent>
+                    {selectedProvider && (
+                        <Box>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                You are about to start the credentialing process for this provider.
+                                This will initiate a comprehensive review of their credentials and compliance status.
+                            </Alert>
+
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Provider ID"
+                                        value={selectedProvider.provider_id}
+                                        disabled
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Provider Name"
+                                        value={selectedProvider.name}
+                                        disabled
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Specialty"
+                                        value={selectedProvider.specialty}
+                                        disabled
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Experience"
+                                        value={selectedProvider.experience_years ? `${selectedProvider.experience_years} years` :
+                                            selectedProvider.years_experience ? `${selectedProvider.years_experience} years` : 'N/A'}
+                                        disabled
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            {credentialingDetails && (
+                                <Box sx={{ mt: 3 }}>
+                                    <Alert severity="success" sx={{ mb: 2 }}>
+                                        Credentialing process completed successfully!
+                                    </Alert>
+
+                                    <Typography variant="h6" gutterBottom>
+                                        Credentialing Results:
+                                    </Typography>
+
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Status"
+                                                value={credentialingDetails.status || 'Completed'}
+                                                disabled
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Processing Time"
+                                                value={`${credentialingDetails.processing_time || 'N/A'}`}
+                                                disabled
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Compliance Score"
+                                                value={credentialingDetails.score || 'N/A'}
+                                                disabled
+                                            />
+                                        </Grid>
+                                        {credentialingDetails.message && (
+                                            <Grid item xs={12}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Details"
+                                                    value={credentialingDetails.message}
+                                                    disabled
+                                                    multiline
+                                                    rows={3}
+                                                />
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => {
+                        setCredentialingDialog(false);
+                        setCredentialingDetails(null);
+                    }}>
+                        {credentialingDetails ? 'Close' : 'Cancel'}
+                    </Button>
+                    {!credentialingDetails && (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={confirmStartCredentialing}
+                            disabled={credentialingInProgress}
+                        >
+                            {credentialingInProgress ? 'Processing...' : 'Confirm & Start'}
+                        </Button>
+                    )}
                 </DialogActions>
             </Dialog>
         </Box>
